@@ -32,22 +32,20 @@ exports.userLogin = async (req, res) => {
         .status(400)
         .send({ errorMessage: "Username or password invalid" });
     }
-    const accessToken = jwt.sign(
-      { userId: user.userName },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
+    const accessToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1m",
+    });
     const refreshToken = jwt.sign(
       { userId: user._id },
       process.env.REFRESH_JWT_SECRET,
-      { expiresIn: "2h" }
+      { expiresIn: "1m" }
     );
     let newRefreshTokenArray = !cookies?.jwt
       ? user.refreshToken
       : user.refreshToken.filter((rt) => rt !== cookies.jwt);
     if (cookies?.jwt) {
       const refreshToken = cookies.jwt;
-      const foundToken = await user.findOne({ refreshToken }).exec();
+      const foundToken = await userModel.findOne({ refreshToken }).exec();
 
       if (!foundToken) {
         newRefreshTokenArray = [];
@@ -70,6 +68,15 @@ exports.userLogin = async (req, res) => {
     res.json({ message: "user login successfull", accessToken });
   } catch (err) {
     console.log("err", err.message);
+    res.status(500).send({ errorMessage: "Internal server error" });
+  }
+};
+
+exports.getUsers = async (req, res) => {
+  try {
+    const users = await userModel.find({});
+    res.status(200).send(users);
+  } catch (err) {
     res.status(500).send({ errorMessage: "Internal server error" });
   }
 };
