@@ -38,14 +38,14 @@ exports.userLogin = async (req, res) => {
     const refreshToken = jwt.sign(
       { userId: user._id },
       process.env.REFRESH_JWT_SECRET,
-      { expiresIn: "1m" }
+      { expiresIn: "1h" }
     );
     let newRefreshTokenArray = !cookies?.jwt
       ? user.refreshToken
       : user.refreshToken.filter((rt) => rt !== cookies.jwt);
     if (cookies?.jwt) {
       const refreshToken = cookies.jwt;
-      const foundToken = await userModel.findOne({ refreshToken }).exec();
+      const foundToken = await userModel.findOne({ refreshToken });
 
       if (!foundToken) {
         newRefreshTokenArray = [];
@@ -76,6 +76,40 @@ exports.getUsers = async (req, res) => {
   try {
     const users = await userModel.find({});
     res.status(200).send(users);
+  } catch (err) {
+    res.status(500).send({ errorMessage: "Internal server error" });
+  }
+};
+
+exports.logout = async (req, res) => {
+  try {
+    const cookies = req.cookies;
+    if (!cookies?.jwt) return res.sendStatus(204); //No content
+    const refreshToken = cookies.jwt;
+
+    // Is refreshToken in db?
+    const foundUser = await userModel.findOne({ refreshToken });
+    if (!foundUser) {
+      res.clearCookie("jwt", {
+        httpOnly: true,
+        sameSite: "None",
+        secure: true,
+      });
+      return res.sendStatus(204);
+    }
+
+    // Delete refreshToken in db
+    const otherUsers = foundUser.refreshToken.filter(
+      (val) => val !== refreshToken
+    );
+    foundUser.refreshToken = otherUsers;
+    await foundUser.save();
+    res.clearCookie("jwt", {
+      httpOnly: true,
+      sameSite: "None",
+      secure: true,
+    });
+    res.sendStatus(204);
   } catch (err) {
     res.status(500).send({ errorMessage: "Internal server error" });
   }
